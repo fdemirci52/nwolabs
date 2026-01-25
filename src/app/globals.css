@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  --background: #1a1a1a;
+  --foreground: #ffffff;
+  --grid-margin: 28px;
+  --grid-gutter: 28px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+/* 8 Column Grid System */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: auto auto 1fr;
+  gap: var(--grid-gutter);
+  padding: var(--grid-margin);
+  height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
