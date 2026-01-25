@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// Matrix Digital Rain characters (Latin + Numbers)
-// Removed Katakana temporarily to prevent horizontal jitter if font doesn't support monospaced half-width perfectly
-const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~";
+// ASCII characters from sparse to dense for fading effect
+// Low opacity = sparse char, high opacity = dense char
+const DENSITY_CHARS = " .:-=+*#%@";
+const MATRIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~";
 
 interface Stream {
   x: number;
   y: number;
   speed: number;
-  length: number;
-  chars: string[];
+}
+
+interface Cell {
+  char: string;
+  value: number; // 0.0 to 1.0 (opacity/brightness simulation)
 }
 
 export default function AnimatedAsciiArt() {
@@ -20,27 +24,33 @@ export default function AnimatedAsciiArt() {
   const [dimensions, setDimensions] = useState({ cols: 0, rows: 0 });
   const animationRef = useRef<number>(0);
   
-  // Store streams in ref to avoid re-renders
+  // Grid state to maintain persistence between frames
+  const gridRef = useRef<Cell[][]>([]);
   const streamsRef = useRef<Stream[]>([]);
   const frameCountRef = useRef<number>(0);
 
-  // Initialize streams
-  const initStreams = useCallback((cols: number, rows: number) => {
+  // Initialize streams and grid
+  const initSystem = useCallback((cols: number, rows: number) => {
+    // Init grid
+    const grid: Cell[][] = [];
+    for (let y = 0; y < rows; y++) {
+      const row: Cell[] = [];
+      for (let x = 0; x < cols; x++) {
+        row.push({ char: " ", value: 0 });
+      }
+      grid.push(row);
+    }
+    gridRef.current = grid;
+
+    // Init streams
     const streams: Stream[] = [];
     for (let i = 0; i < cols; i++) {
-      const length = Math.floor(Math.random() * (rows / 2)) + 5;
-      const chars: string[] = [];
-      for (let j = 0; j < length; j++) {
-        chars.push(CHARS[Math.floor(Math.random() * CHARS.length)]);
-      }
-      
-      streams.push({
-        x: i,
-        y: Math.random() * -rows * 2, // Start above viewport with random offset
-        speed: Math.random() * 0.5 + 0.2, // Random speed
-        length,
-        chars
-      });
+        // Start randomly positioned
+        streams.push({
+          x: i,
+          y: Math.random() * -rows, 
+          speed: Math.random() * 0.15 + 0.05 // Slower speed (was 0.3 + 0.1)
+        });
     }
     streamsRef.current = streams;
   }, []);
@@ -61,10 +71,9 @@ export default function AnimatedAsciiArt() {
       const cols = Math.floor(width / charWidth);
       const rows = Math.ceil(height / charHeight) + 1;
 
-      // Only re-init streams if dimensions changed significantly
       setDimensions(prev => {
         if (prev.cols !== cols || prev.rows !== rows) {
-          initStreams(cols, rows);
+          initSystem(cols, rows);
           return { cols, rows };
         }
         return prev;
@@ -75,68 +84,89 @@ export default function AnimatedAsciiArt() {
     resizeObserver.observe(containerRef.current);
 
     return () => resizeObserver.disconnect();
-  }, [initStreams]);
+  }, [initSystem]);
 
   // Generate animated ASCII frame
   const generateFrame = useCallback(() => {
     const { cols, rows } = dimensions;
-    if (cols === 0 || rows === 0) {
+    if (cols === 0 || rows === 0 || gridRef.current.length === 0) {
       animationRef.current = requestAnimationFrame(generateFrame);
       return;
     }
 
+    const grid = gridRef.current;
     const streams = streamsRef.current;
-    const grid: string[][] = Array(rows).fill(null).map(() => Array(cols).fill(" "));
-    
-    // Update and draw streams
+
+    // 1. Fade out all cells
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (grid[y] && grid[y][x].value > 0) {
+          grid[y][x].value -= 0.015; // Slower fade for longer trails (was 0.03)
+          
+          // Randomly flicker character while active
+          if (grid[y][x].value > 0.5 && Math.random() < 0.05) {
+            grid[y][x].char = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+          }
+
+          if (grid[y][x].value <= 0) {
+            grid[y][x].value = 0;
+            grid[y][x].char = " ";
+          }
+        }
+      }
+    }
+
+    // 2. Update streams and active cells
     streams.forEach(stream => {
-      // Update position
       stream.y += stream.speed;
-      
-      // Reset if fully off screen
-      if (stream.y - stream.length > rows) {
-        stream.y = Math.random() * -10;
-        stream.speed = Math.random() * 0.5 + 0.2;
-        stream.length = Math.floor(Math.random() * (rows / 2)) + 5;
-        // Regenerate characters
-        stream.chars = [];
-        for (let i = 0; i < stream.length; i++) {
-          stream.chars.push(CHARS[Math.floor(Math.random() * CHARS.length)]);
-        }
-      }
 
-      // Randomly flicker characters
-      if (frameCountRef.current % 3 === 0) { // Flicker every few frames
-        stream.chars.forEach((_, idx) => {
-          if (Math.random() < 0.05) { // 5% chance
-            stream.chars[idx] = CHARS[Math.floor(Math.random() * CHARS.length)];
-          }
-        });
-      }
-
-      // Draw stream to grid
       const headY = Math.floor(stream.y);
-      for (let i = 0; i < stream.length; i++) {
-        const charY = headY - i;
-        // Only draw if within bounds
-        if (charY >= 0 && charY < rows) {
-          // Use the character from the stream's array
-          // To simulate fading, we use characters with less visual weight at the tail
-          // or just standard characters since we can't change opacity
-          let char = stream.chars[i % stream.chars.length];
-          
-          // Optional: Add some empty spaces in the tail to simulate "breaking up"
-          if (i > stream.length * 0.7 && Math.random() > 0.5) {
-             char = " "; // Glitch/fade effect at the tail
-          }
-          
-          grid[charY][stream.x] = char;
+      
+      // If head is within bounds, activate that cell
+      if (headY >= 0 && headY < rows) {
+        // Only update if we moved to a new cell
+        if (grid[headY] && grid[headY][stream.x]) {
+             // Pick a random char for the head
+             grid[headY][stream.x].char = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+             grid[headY][stream.x].value = 1.0; // Max brightness
         }
+      }
+
+      // Reset stream if trail is gone
+      if (stream.y > rows + 20) {
+        stream.y = Math.random() * -10;
+        stream.speed = Math.random() * 0.15 + 0.05; // Maintain slow speed on respawn
       }
     });
 
-    // Convert grid to string
-    const result = grid.map(row => row.join("")).join("\n");
+    // 3. Render grid to string
+    let result = "";
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const cell = grid[y][x];
+        if (cell.value > 0) {
+            // Use opacity value to determine character density
+            if (cell.value > 0.8) {
+                // Head / Very bright: Use the assigned matrix char
+                result += cell.char;
+            } else {
+                // Tail: Fade out using density chars
+                // Map 0.0-0.8 range to density chars
+                // We want high value -> high index (dense char)
+                // We want low value -> low index (sparse char)
+                
+                const normalizedVal = cell.value / 0.8;
+                const index = Math.floor(normalizedVal * (DENSITY_CHARS.length - 1));
+                // Clamp index to be safe
+                const safeIndex = Math.max(0, Math.min(index, DENSITY_CHARS.length - 1));
+                result += DENSITY_CHARS[safeIndex];
+            }
+        } else {
+            result += " ";
+        }
+      }
+      if (y < rows - 1) result += "\n";
+    }
 
     setAscii(result);
     frameCountRef.current++;

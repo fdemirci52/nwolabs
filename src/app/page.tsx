@@ -24,8 +24,16 @@ export default function Home() {
         {mode === "video" ? <VideoAsciiArt /> : <AnimatedAsciiArt />}
       </div>
 
+      {/* Top Gradient Overlay */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-[235px] z-20 pointer-events-none"
+        style={{
+          background: "linear-gradient(to bottom, #1a1a1a 100%, transparent 100%)"
+        }}
+      />
+
       {/* Content Layer */}
-      <div className="grid-container relative z-10 pointer-events-none">
+      <div className="grid-container relative z-30 pointer-events-none">
         {/* Header Row */}
         <header className="col-span-8 flex justify-between items-start pointer-events-auto">
           <div className="font-light">NWO LABS</div>
