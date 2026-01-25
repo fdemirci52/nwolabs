@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// ASCII characters from sparse to dense for fading effect
-// Low opacity = sparse char, high opacity = dense char
-const DENSITY_CHARS = " .:-=+*#%@";
+// Matrix Digital Rain characters (Latin + Numbers + Symbols)
 const MATRIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~";
 
 interface Stream {
@@ -15,28 +13,57 @@ interface Stream {
 
 interface Cell {
   char: string;
-  value: number; // 0.0 to 1.0 (opacity/brightness simulation)
+  value: number; // 0.0 to 1.0 (opacity)
 }
 
 export default function AnimatedAsciiArt() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [ascii, setAscii] = useState<string>("");
-  const [dimensions, setDimensions] = useState({ cols: 0, rows: 0 });
-  const animationRef = useRef<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Grid state to maintain persistence between frames
+  // Grid state
   const gridRef = useRef<Cell[][]>([]);
   const streamsRef = useRef<Stream[]>([]);
-  const frameCountRef = useRef<number>(0);
+  const animationRef = useRef<number>(0);
+  
+  // Dimensions
+  const dimsRef = useRef({ width: 0, height: 0, cols: 0, rows: 0, charWidth: 0, charHeight: 0 });
 
-  // Initialize streams and grid
-  const initSystem = useCallback((cols: number, rows: number) => {
+  // Initialize system
+  const initSystem = useCallback((width: number, height: number) => {
+    // Font metrics
+    // We need to measure char width accurately
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.font = "14px 'IBM Plex Mono', monospace";
+    const metrics = ctx.measureText("A");
+    const charWidth = metrics.width;
+    const charHeight = 21; // Approximate line height for 14px font
+
+    const cols = Math.floor(width / charWidth);
+    const rows = Math.ceil(height / charHeight) + 1;
+
+    // Save dimensions
+    dimsRef.current = { width, height, cols, rows, charWidth, charHeight };
+
+    // Resize canvas
+    // Use device pixel ratio for sharp text
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.scale(dpr, dpr);
+    ctx.font = "14px 'IBM Plex Mono', monospace"; // Re-set font after resize
+
     // Init grid
     const grid: Cell[][] = [];
     for (let y = 0; y < rows; y++) {
       const row: Cell[] = [];
       for (let x = 0; x < cols; x++) {
-        row.push({ char: " ", value: 0 });
+        row.push({ char: "", value: 0 });
       }
       grid.push(row);
     }
@@ -45,39 +72,28 @@ export default function AnimatedAsciiArt() {
     // Init streams
     const streams: Stream[] = [];
     for (let i = 0; i < cols; i++) {
-        // Start randomly positioned
         streams.push({
           x: i,
           y: Math.random() * -rows, 
-          speed: Math.random() * 0.15 + 0.05 // Slower speed (was 0.3 + 0.1)
+          speed: Math.random() * 0.1 + 0.05 // Slower speed (was 0.2 + 0.1)
         });
     }
     streamsRef.current = streams;
   }, []);
 
-  // Calculate dimensions based on container size using ResizeObserver
+  // Handle resize
   useEffect(() => {
     if (!containerRef.current) return;
-
-    const charWidth = 8.4; // IBM Plex Mono 14px approximate char width
-    const charHeight = 21; // Line height
 
     const updateDimensions = (entries: ResizeObserverEntry[]) => {
       const entry = entries[0];
       if (!entry) return;
-
       const { width, height } = entry.contentRect;
-
-      const cols = Math.floor(width / charWidth);
-      const rows = Math.ceil(height / charHeight) + 1;
-
-      setDimensions(prev => {
-        if (prev.cols !== cols || prev.rows !== rows) {
-          initSystem(cols, rows);
-          return { cols, rows };
-        }
-        return prev;
-      });
+      
+      // Only re-init if significant change to avoid jitter
+      if (Math.abs(width - dimsRef.current.width) > 5 || Math.abs(height - dimsRef.current.height) > 5) {
+        initSystem(width, height);
+      }
     };
 
     const resizeObserver = new ResizeObserver(updateDimensions);
@@ -86,115 +102,115 @@ export default function AnimatedAsciiArt() {
     return () => resizeObserver.disconnect();
   }, [initSystem]);
 
-  // Generate animated ASCII frame
-  const generateFrame = useCallback(() => {
-    const { cols, rows } = dimensions;
-    if (cols === 0 || rows === 0 || gridRef.current.length === 0) {
-      animationRef.current = requestAnimationFrame(generateFrame);
+  // Animation Loop
+  const animate = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const { cols, rows, charWidth, charHeight, width, height } = dimsRef.current;
+    if (cols === 0 || rows === 0) {
+      animationRef.current = requestAnimationFrame(animate);
       return;
     }
 
     const grid = gridRef.current;
     const streams = streamsRef.current;
 
-    // 1. Fade out all cells
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+    
+    // 1. Fade out and flicker cells
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         if (grid[y] && grid[y][x].value > 0) {
-          grid[y][x].value -= 0.015; // Slower fade for longer trails (was 0.03)
+          grid[y][x].value -= 0.005; // Slower fade speed (was 0.01)
           
-          // Randomly flicker character while active
-          if (grid[y][x].value > 0.5 && Math.random() < 0.05) {
-            grid[y][x].char = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
-          }
-
           if (grid[y][x].value <= 0) {
             grid[y][x].value = 0;
-            grid[y][x].char = " ";
+            grid[y][x].char = "";
+          } else {
+             // Randomly flicker character
+             if (grid[y][x].value > 0.5 && Math.random() < 0.01) {
+                grid[y][x].char = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+             }
           }
         }
       }
     }
 
-    // 2. Update streams and active cells
+    // 2. Update streams
     streams.forEach(stream => {
       stream.y += stream.speed;
-
       const headY = Math.floor(stream.y);
       
-      // If head is within bounds, activate that cell
       if (headY >= 0 && headY < rows) {
-        // Only update if we moved to a new cell
         if (grid[headY] && grid[headY][stream.x]) {
-             // Pick a random char for the head
+             // New character at head
              grid[headY][stream.x].char = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
-             grid[headY][stream.x].value = 1.0; // Max brightness
+             grid[headY][stream.x].value = 1.0; // Max opacity
         }
       }
 
-      // Reset stream if trail is gone
-      if (stream.y > rows + 20) {
+      if (stream.y > rows + 10) {
         stream.y = Math.random() * -10;
-        stream.speed = Math.random() * 0.15 + 0.05; // Maintain slow speed on respawn
+        stream.speed = Math.random() * 0.1 + 0.05; // Slower speed (was 0.2 + 0.1)
       }
     });
 
-    // 3. Render grid to string
-    let result = "";
+    // 3. Render grid to Canvas
+    ctx.font = "300 14px 'IBM Plex Mono', monospace";
+    ctx.textBaseline = "top";
+    
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const cell = grid[y][x];
         if (cell.value > 0) {
-            // Use opacity value to determine character density
-            if (cell.value > 0.8) {
-                // Head / Very bright: Use the assigned matrix char
-                result += cell.char;
+            const xPos = x * charWidth;
+            const yPos = y * charHeight;
+
+            // Opacity logic
+            // Head (value ~ 1.0) is bright white/light gray
+            // Tail (value < 1.0) fades to #888 then to transparent
+            
+            // Base color is #888 (136, 136, 136)
+            // But for head we might want it brighter?
+            // User asked for "char opacity lower", so let's stick to #888 but with alpha
+            
+            // If value is very high (head), maybe make it brighter (white)
+            if (cell.value > 0.9) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${cell.value})`; 
+                // Or if we want strict #888: `rgba(136, 136, 136, ${cell.value})`
+                // But usually Matrix head is white. Let's use #BBB for head to make it pop slightly
+                ctx.fillStyle = `rgba(187, 187, 187, ${cell.value})`;
             } else {
-                // Tail: Fade out using density chars
-                // Map 0.0-0.8 range to density chars
-                // We want high value -> high index (dense char)
-                // We want low value -> low index (sparse char)
-                
-                const normalizedVal = cell.value / 0.8;
-                const index = Math.floor(normalizedVal * (DENSITY_CHARS.length - 1));
-                // Clamp index to be safe
-                const safeIndex = Math.max(0, Math.min(index, DENSITY_CHARS.length - 1));
-                result += DENSITY_CHARS[safeIndex];
+                ctx.fillStyle = `rgba(136, 136, 136, ${cell.value})`;
             }
-        } else {
-            result += " ";
+
+            ctx.fillText(cell.char, xPos, yPos);
         }
       }
-      if (y < rows - 1) result += "\n";
     }
 
-    setAscii(result);
-    frameCountRef.current++;
-    animationRef.current = requestAnimationFrame(generateFrame);
-  }, [dimensions]);
+    animationRef.current = requestAnimationFrame(animate);
+  }, []);
 
-  // Start animation loop
+  // Start animation
   useEffect(() => {
-    if (dimensions.cols > 0 && dimensions.rows > 0) {
-      animationRef.current = requestAnimationFrame(generateFrame);
-    }
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [dimensions, generateFrame]);
+    animationRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [animate]);
 
   return (
     <div
       ref={containerRef}
       className="w-full h-full overflow-hidden select-none relative"
     >
-      {/* ASCII output - anchored to bottom */}
-      <pre className="absolute bottom-0 left-0 right-0 text-[14px] leading-[21px] font-light whitespace-pre mb-1 p-0 text-[#888]">
-        {ascii || "Loading..."}
-      </pre>
+      <canvas 
+        ref={canvasRef}
+        className="block"
+      />
     </div>
   );
 }
