@@ -4,26 +4,19 @@ import { useState } from "react";
 import VideoAsciiArt from "@/components/VideoAsciiArt";
 import AnimatedAsciiArt from "@/components/AnimatedAsciiArt";
 import GameOfLifeAsciiArt from "@/components/GameOfLifeAsciiArt";
+import FlameAsciiArt from "@/components/FlameAsciiArt";
 
-type AsciiMode = "video" | "animated" | "gameoflife";
+type AsciiMode = "video" | "animated" | "gameoflife" | "flame";
 
-const MODE_ORDER: AsciiMode[] = ["video", "animated", "gameoflife"];
-const MODE_LABELS: Record<AsciiMode, string> = {
-  video: "VIDEO",
-  animated: "MATRIX",
-  gameoflife: "LIFE",
-};
+const MODES: { id: AsciiMode; label: string }[] = [
+  { id: "video", label: "VIDEO" },
+  { id: "animated", label: "MATRIX" },
+  { id: "gameoflife", label: "LIFE" },
+  { id: "flame", label: "FLAME" },
+];
 
 export default function Home() {
   const [mode, setMode] = useState<AsciiMode>("gameoflife");
-
-  const toggleMode = () => {
-    setMode((m) => {
-      const currentIndex = MODE_ORDER.indexOf(m);
-      const nextIndex = (currentIndex + 1) % MODE_ORDER.length;
-      return MODE_ORDER[nextIndex];
-    });
-  };
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
@@ -32,6 +25,7 @@ export default function Home() {
         {mode === "video" && <VideoAsciiArt />}
         {mode === "animated" && <AnimatedAsciiArt />}
         {mode === "gameoflife" && <GameOfLifeAsciiArt />}
+        {mode === "flame" && <FlameAsciiArt />}
       </div>
 
       {/* Content Layer */}
@@ -40,12 +34,17 @@ export default function Home() {
         <header className="col-span-8 flex justify-between items-start">
           <div className="font-light">NWO LABS</div>
           <nav className="flex gap-[20px] pointer-events-auto">
-            <button
-              onClick={toggleMode}
-              className="hover:opacity-70 transition-opacity cursor-pointer"
-            >
-              [{MODE_LABELS[mode]}]
-            </button>
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className={`hover:opacity-70 transition-opacity cursor-pointer ${
+                  mode === m.id ? "opacity-100" : "opacity-50"
+                }`}
+              >
+                [{m.label}]
+              </button>
+            ))}
             <a href="#about" className="hover:opacity-70 transition-opacity">[ABOUT]</a>
             <a href="#apps" className="hover:opacity-70 transition-opacity">[APPS]</a>
           </nav>
