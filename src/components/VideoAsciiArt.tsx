@@ -10,7 +10,7 @@ interface VideoAsciiArtProps {
   videoSrc?: string;
 }
 
-export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsciiArtProps) {
+export default function VideoAsciiArt({ videoSrc = "/ascii-video.mov" }: VideoAsciiArtProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
