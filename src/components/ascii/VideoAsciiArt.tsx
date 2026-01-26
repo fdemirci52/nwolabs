@@ -4,13 +4,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 // ASCII characters from sparse to dense (for dark background)
 // Dark pixels = empty space, bright pixels = dense characters
-const ASCII_CHARS = " .`'^,:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+const ASCII_CHARS = " .`'^,:;l!i><~+_-?]0[}{1|/*#•—%x⁰⁴⁷—⁺⁻⁼₀₁₃₊$&☐‡°®";
 
 interface VideoAsciiArtProps {
   videoSrc?: string;
 }
 
-export default function VideoAsciiArt({ videoSrc = "/ascii-video.mov" }: VideoAsciiArtProps) {
+export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsciiArtProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,8 +26,8 @@ export default function VideoAsciiArt({ videoSrc = "/ascii-video.mov" }: VideoAs
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const charWidth = 8.4; // IBM Plex Mono 14px approximate char width
-    const charHeight = 21; // Line height
+    const charWidth = 6; // IBM Plex Mono 10px approximate char width
+    const charHeight = 14; // Line height
 
     const updateDimensions = (entries: ResizeObserverEntry[]) => {
       const entry = entries[0];
@@ -49,8 +49,17 @@ export default function VideoAsciiArt({ videoSrc = "/ascii-video.mov" }: VideoAs
   }, []);
 
   // Convert brightness (0-255) to ASCII character
+  // Darkness threshold: pixels below this become empty (0-255, higher = more empty space)
+  const DARK_THRESHOLD = 30;
+  
   const brightnessToAscii = useCallback((brightness: number): string => {
-    const index = Math.floor((brightness / 255) * (ASCII_CHARS.length - 1));
+    // Return space for dark/gray areas
+    if (brightness < DARK_THRESHOLD) {
+      return " ";
+    }
+    // Map remaining brightness range to ASCII characters
+    const adjusted = (brightness - DARK_THRESHOLD) / (255 - DARK_THRESHOLD);
+    const index = Math.floor(adjusted * (ASCII_CHARS.length - 1));
     return ASCII_CHARS[index];
   }, []);
 
@@ -185,7 +194,7 @@ export default function VideoAsciiArt({ videoSrc = "/ascii-video.mov" }: VideoAs
       />
 
       {/* ASCII output - anchored to bottom */}
-      <pre className="absolute bottom-0 left-0 right-0 text-[14px] leading-[21px] font-light whitespace-pre mb-1 p-0 text-[#888]">
+      <pre className="absolute bottom-0 left-0 right-0 text-[10px] leading-[14px] font-light whitespace-pre mb-1 p-0 text-[#888]">
         {ascii || "Loading..."}
       </pre>
     </div>
