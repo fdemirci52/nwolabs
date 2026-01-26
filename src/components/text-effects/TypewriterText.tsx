@@ -47,7 +47,13 @@ export default function TypewriterText({
 
     // Wait for delay before starting
     const delayTimeout = setTimeout(() => {
+      // Show cursor immediately when typing starts
       setShowCursor(true);
+      
+      // Start cursor blink
+      cursorBlinkRef.current = setInterval(() => {
+        setCursorVisible((v) => !v);
+      }, 530);
       
       // Start typing
       intervalRef.current = setInterval(() => {
@@ -55,31 +61,26 @@ export default function TypewriterText({
           setDisplayedText(children.slice(0, currentIndex + 1));
           currentIndex++;
         } else {
-          // Typing complete
+          // Typing complete - hide cursor immediately
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
           }
-          // Keep cursor blinking for a moment then hide
-          setTimeout(() => {
-            setShowCursor(false);
-            setIsTypingComplete(true);
-            onComplete?.();
-          }, 500);
+          if (cursorBlinkRef.current) {
+            clearInterval(cursorBlinkRef.current);
+          }
+          setShowCursor(false);
+          setIsTypingComplete(true);
+          onComplete?.();
         }
       }, charInterval);
     }, delay);
-
-    // Cursor blink effect
-    cursorBlinkRef.current = setInterval(() => {
-      setCursorVisible((v) => !v);
-    }, 530);
 
     return () => {
       clearTimeout(delayTimeout);
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (cursorBlinkRef.current) clearInterval(cursorBlinkRef.current);
     };
-  }, [children, delay, charsPerSecond]);
+  }, [children, delay, charsPerSecond, onComplete]);
 
   const content = (
     <>
