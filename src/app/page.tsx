@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import VideoAsciiArt from "@/components/VideoAsciiArt";
-import AnimatedAsciiArt from "@/components/AnimatedAsciiArt";
-import GameOfLifeAsciiArt from "@/components/GameOfLifeAsciiArt";
-import FlameAsciiArt from "@/components/FlameAsciiArt";
-import TypewriterText from "@/components/TypewriterText";
-import HoverRevealText from "@/components/HoverRevealText";
+import VideoAsciiArt from "@/components/ascii/VideoAsciiArt";
+import AnimatedAsciiArt from "@/components/ascii/AnimatedAsciiArt";
+import GameOfLifeAsciiArt from "@/components/ascii/GameOfLifeAsciiArt";
+import FlameAsciiArt from "@/components/ascii/FlameAsciiArt";
+import TypewriterText from "@/components/text-effects/TypewriterText";
+import HoverRevealText from "@/components/text-effects/HoverRevealText";
 
 type AsciiMode = "video" | "animated" | "gameoflife" | "flame";
 
