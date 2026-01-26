@@ -99,7 +99,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-start"
+      className="fixed inset-0 z-50 flex items-start justify-start select-none"
       style={{ backgroundColor: "#1b1b1b" }}
     >
       {/* Typing phase - show lines (hidden instantly when cursor phase starts) */}
