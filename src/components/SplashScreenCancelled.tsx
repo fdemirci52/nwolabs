@@ -23,7 +23,7 @@ const STAGGER_DELAY = 50;
 const MIN_PAUSE = 100;
 const MAX_PAUSE = 600;
 
-export default function SplashScreenFull({ onComplete }: SplashScreenProps) {
+export default function SplashScreenCancelled({ onComplete }: SplashScreenProps) {
   const [typingComplete, setTypingComplete] = useState(false);
   const [phase, setPhase] = useState<"typing" | "cursor" | "waiting" | "done">("typing");
   const [cursorVisible, setCursorVisible] = useState(true);

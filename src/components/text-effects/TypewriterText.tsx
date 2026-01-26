@@ -26,7 +26,7 @@ export default function TypewriterText({
   charsPerSecond = 30,
   glitchRadius = 100,
   glitchIntensity = 0.7,
-  cursor = "_",
+  cursor = "▍",
   hideCursor = false,
   onClick,
   as = "span",
