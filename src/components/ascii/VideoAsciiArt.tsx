@@ -51,6 +51,8 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   const [invert, setInvert] = useState(false);
   const [charSetKey, setCharSetKey] = useState<keyof typeof CHARACTER_SETS>("default");
   const [colored, setColored] = useState(false);
+  const [fontSize, setFontSize] = useState(10);
+  const [lineHeight, setLineHeight] = useState(14);
 
   // Refs for current settings (to avoid stale closures)
   const darkThresholdRef = useRef(darkThreshold);
@@ -58,6 +60,8 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   const invertRef = useRef(invert);
   const charSetRef = useRef(CHARACTER_SETS[charSetKey].chars);
   const coloredRef = useRef(colored);
+  const fontSizeRef = useRef(fontSize);
+  const lineHeightRef = useRef(lineHeight);
 
   // Update refs when state changes
   useEffect(() => {
@@ -80,15 +84,26 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
     coloredRef.current = colored;
   }, [colored]);
 
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+  }, [fontSize]);
+
+  useEffect(() => {
+    lineHeightRef.current = lineHeight;
+  }, [lineHeight]);
+
   // Character aspect ratio compensation (characters are taller than wide)
-  const charAspectRatio = 0.5;
+  // Dynamically calculated based on font size and line height
+  const charWidth = fontSize * 0.6;
+  const charAspectRatio = charWidth / lineHeight;
 
   // Calculate dimensions based on container size using ResizeObserver
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const charWidth = 6; // IBM Plex Mono 10px approximate char width
-    const charHeight = 14; // Line height
+    // Approximate char width based on font size (monospace ratio ~0.6)
+    const effectiveCharWidth = fontSize * 0.6;
+    const charHeight = lineHeight;
 
     const updateDimensions = (entries: ResizeObserverEntry[]) => {
       const entry = entries[0];
@@ -96,7 +111,7 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
 
       const { width, height } = entry.contentRect;
 
-      const cols = Math.floor(width / charWidth);
+      const cols = Math.floor(width / effectiveCharWidth);
       // Use ceil + 1 to ensure we fill the entire container (overflow is hidden)
       const rows = Math.ceil(height / charHeight) + 1;
 
@@ -107,7 +122,7 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
     resizeObserver.observe(containerRef.current);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [fontSize, lineHeight]);
 
   // Convert brightness (0-255) to ASCII character
   const brightnessToAscii = useCallback((brightness: number): string => {
@@ -261,6 +276,8 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
     setInvert(false);
     setCharSetKey("default");
     setColored(false);
+    setFontSize(10);
+    setLineHeight(14);
   };
 
   // Render ASCII with or without colors
@@ -317,7 +334,10 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
       />
 
       {/* ASCII output - anchored to bottom */}
-      <pre className="absolute bottom-0 left-0 right-0 text-[10px] leading-[14px] font-light whitespace-pre mb-1 p-0 text-[#888]">
+      <pre 
+        className="absolute bottom-0 left-0 right-0 font-light whitespace-pre mb-1 p-0 text-[#888]"
+        style={{ fontSize: `${fontSize}px`, lineHeight: `${lineHeight}px` }}
+      >
         {renderAscii()}
       </pre>
 
@@ -399,6 +419,38 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
               step="0.1"
               value={contrast}
               onChange={(e) => setContrast(Number(e.target.value))}
+              className="w-full h-1 bg-[#444] appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer"
+            />
+          </div>
+
+          {/* Font Size */}
+          <div className="mb-3">
+            <div className="flex justify-between text-[#999] mb-1">
+              <span>FONT SIZE</span>
+              <span className="text-white">{fontSize}px</span>
+            </div>
+            <input
+              type="range"
+              min="6"
+              max="24"
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="w-full h-1 bg-[#444] appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer"
+            />
+          </div>
+
+          {/* Line Height */}
+          <div className="mb-3">
+            <div className="flex justify-between text-[#999] mb-1">
+              <span>LINE HEIGHT</span>
+              <span className="text-white">{lineHeight}px</span>
+            </div>
+            <input
+              type="range"
+              min="8"
+              max="32"
+              value={lineHeight}
+              onChange={(e) => setLineHeight(Number(e.target.value))}
               className="w-full h-1 bg-[#444] appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer"
             />
           </div>
