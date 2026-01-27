@@ -11,15 +11,6 @@ import SplashScreen from "@/components/SplashScreen";
 
 type AsciiMode = "video" | "animated" | "gameoflife" | "flame";
 
-const SERVICES = [
-  "MOBILE APPS",
-  "WEB APPS",
-  "DESIGN & DEVELOPMENT",
-  "NEXT.JS",
-  "VERCEL",
-  "SUPABASE",
-];
-
 // Typing speed (characters per second)
 const CHARS_PER_SECOND = 18;
 // Stagger delay between each line (ms)
@@ -32,7 +23,6 @@ const NAV_ITEMS = [
   { text: "LIFE", id: "gameoflife" as const },
   { text: "FLAME", id: "flame" as const },
   { text: "ABOUT", href: "#about" },
-  { text: "APPS", href: "#apps" },
 ];
 
 export default function Home() {
@@ -54,21 +44,6 @@ export default function Home() {
 
   const handleSplashComplete = () => {
     setShowSplash(false);
-  };
-
-  // Calculate delay for each service based on previous lines
-  const getServiceDelay = (index: number) => {
-    // Header "NWO LABS" starts at 0, takes some time
-    const headerDuration = ("NWO LABS".length / CHARS_PER_SECOND) * 1000;
-    // Base delay after header
-    let totalDelay = headerDuration + STAGGER_DELAY;
-    
-    // Add stagger for each previous service
-    for (let i = 0; i < index; i++) {
-      totalDelay += STAGGER_DELAY;
-    }
-    
-    return totalDelay;
   };
 
   // Calculate delay for nav items (start after NWO LABS with stagger)
@@ -170,25 +145,6 @@ export default function Home() {
                 })}
               </nav>
             </header>
-
-            {/* Main Content */}
-            <main className="col-span-8 flex flex-col">
-              {/* Services List */}
-              <ul className="flex flex-col gap-0">
-                {SERVICES.map((service, index) => (
-                  <li key={service}>
-                    <TypewriterText
-                      delay={getServiceDelay(index)}
-                      charsPerSecond={CHARS_PER_SECOND}
-                      glitchRadius={100}
-                      glitchIntensity={0.7}
-                    >
-                      {service}
-                    </TypewriterText>
-                  </li>
-                ))}
-              </ul>
-            </main>
           </div>
         </div>
       )}
