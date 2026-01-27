@@ -2,9 +2,33 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// ASCII characters from sparse to dense (for dark background)
-// Dark pixels = empty space, bright pixels = dense characters
-const ASCII_CHARS = " .`'^,:;l!i><~+_-?]0[}{1|/*#•—%x⁰⁴⁷—⁺⁻⁼₀₁₃₊$&☐‡°®";
+// Character set presets
+const CHARACTER_SETS = {
+  default: {
+    name: "Default",
+    chars: " .`'^,:;l!i><~+_-?]0[}{1|/*#•—%x⁰⁴⁷—⁺⁻⁼₀₁₃₊$&☐‡°®",
+  },
+  blocks: {
+    name: "Blocks",
+    chars: " ░▒▓█",
+  },
+  simple: {
+    name: "Simple",
+    chars: " .-:=+*#%@",
+  },
+  binary: {
+    name: "Binary",
+    chars: " 01",
+  },
+  matrix: {
+    name: "Matrix",
+    chars: " ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ",
+  },
+  dots: {
+    name: "Dots",
+    chars: " ·∘○◎●◉⬤",
+  },
+};
 
 interface VideoAsciiArtProps {
   videoSrc?: string;
@@ -15,9 +39,46 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ascii, setAscii] = useState<string>("");
+  const [asciiColors, setAsciiColors] = useState<string[][]>([]);
   const [dimensions, setDimensions] = useState({ cols: 0, rows: 0 });
   const [isVideoReady, setIsVideoReady] = useState(false);
   const animationRef = useRef<number>(0);
+
+  // Control panel state
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [darkThreshold, setDarkThreshold] = useState(30);
+  const [contrast, setContrast] = useState(1.0);
+  const [invert, setInvert] = useState(false);
+  const [charSetKey, setCharSetKey] = useState<keyof typeof CHARACTER_SETS>("default");
+  const [colored, setColored] = useState(false);
+
+  // Refs for current settings (to avoid stale closures)
+  const darkThresholdRef = useRef(darkThreshold);
+  const contrastRef = useRef(contrast);
+  const invertRef = useRef(invert);
+  const charSetRef = useRef(CHARACTER_SETS[charSetKey].chars);
+  const coloredRef = useRef(colored);
+
+  // Update refs when state changes
+  useEffect(() => {
+    darkThresholdRef.current = darkThreshold;
+  }, [darkThreshold]);
+
+  useEffect(() => {
+    contrastRef.current = contrast;
+  }, [contrast]);
+
+  useEffect(() => {
+    invertRef.current = invert;
+  }, [invert]);
+
+  useEffect(() => {
+    charSetRef.current = CHARACTER_SETS[charSetKey].chars;
+  }, [charSetKey]);
+
+  useEffect(() => {
+    coloredRef.current = colored;
+  }, [colored]);
 
   // Character aspect ratio compensation (characters are taller than wide)
   const charAspectRatio = 0.5;
@@ -49,18 +110,28 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   }, []);
 
   // Convert brightness (0-255) to ASCII character
-  // Darkness threshold: pixels below this become empty (0-255, higher = more empty space)
-  const DARK_THRESHOLD = 30;
-  
   const brightnessToAscii = useCallback((brightness: number): string => {
-    // Return space for dark/gray areas
-    if (brightness < DARK_THRESHOLD) {
+    const chars = charSetRef.current;
+    const threshold = darkThresholdRef.current;
+    const contrastVal = contrastRef.current;
+    const shouldInvert = invertRef.current;
+
+    // Apply invert
+    let adjustedBrightness = shouldInvert ? 255 - brightness : brightness;
+
+    // Apply contrast (centered at 128)
+    adjustedBrightness = ((adjustedBrightness - 128) * contrastVal) + 128;
+    adjustedBrightness = Math.max(0, Math.min(255, adjustedBrightness));
+
+    // Return space for dark areas
+    if (adjustedBrightness < threshold) {
       return " ";
     }
+
     // Map remaining brightness range to ASCII characters
-    const adjusted = (brightness - DARK_THRESHOLD) / (255 - DARK_THRESHOLD);
-    const index = Math.floor(adjusted * (ASCII_CHARS.length - 1));
-    return ASCII_CHARS[index];
+    const normalized = (adjustedBrightness - threshold) / (255 - threshold);
+    const index = Math.floor(normalized * (chars.length - 1));
+    return chars[Math.min(index, chars.length - 1)];
   }, []);
 
   // Process video frame and convert to ASCII
@@ -122,8 +193,11 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
     const pixels = imageData.data;
 
     let result = "";
+    const colors: string[][] = [];
+    const isColored = coloredRef.current;
 
     for (let y = 0; y < rows; y++) {
+      const rowColors: string[] = [];
       for (let x = 0; x < cols; x++) {
         // Map ASCII grid position to sample position
         const sampleY = Math.floor((y / rows) * sampleHeight);
@@ -141,12 +215,24 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
         const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
 
         // Convert to ASCII character
-        result += brightnessToAscii(brightness);
+        const char = brightnessToAscii(brightness);
+        result += char;
+
+        // Store color for this character if colored mode is enabled
+        if (isColored && char !== " ") {
+          rowColors.push(`rgb(${r},${g},${b})`);
+        } else {
+          rowColors.push("");
+        }
       }
+      colors.push(rowColors);
       if (y < rows - 1) result += "\n";
     }
 
     setAscii(result);
+    if (isColored) {
+      setAsciiColors(colors);
+    }
     animationRef.current = requestAnimationFrame(processFrame);
   }, [dimensions, isVideoReady, brightnessToAscii]);
 
@@ -166,6 +252,43 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   // Handle video events
   const handleVideoReady = () => {
     setIsVideoReady(true);
+  };
+
+  // Reset to defaults
+  const handleReset = () => {
+    setDarkThreshold(30);
+    setContrast(1.0);
+    setInvert(false);
+    setCharSetKey("default");
+    setColored(false);
+  };
+
+  // Render ASCII with or without colors
+  const renderAscii = () => {
+    if (!ascii) return "Loading...";
+
+    if (!colored) {
+      return ascii;
+    }
+
+    // Colored mode - render each character with its color
+    const lines = ascii.split("\n");
+    return lines.map((line, y) => (
+      <span key={y}>
+        {line.split("").map((char, x) => {
+          const color = asciiColors[y]?.[x];
+          if (color && char !== " ") {
+            return (
+              <span key={x} style={{ color }}>
+                {char}
+              </span>
+            );
+          }
+          return char;
+        })}
+        {y < lines.length - 1 ? "\n" : ""}
+      </span>
+    ));
   };
 
   return (
@@ -195,8 +318,125 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
 
       {/* ASCII output - anchored to bottom */}
       <pre className="absolute bottom-0 left-0 right-0 text-[10px] leading-[14px] font-light whitespace-pre mb-1 p-0 text-[#888]">
-        {ascii || "Loading..."}
+        {renderAscii()}
       </pre>
+
+      {/* Control Panel Toggle */}
+      <button
+        onClick={() => setIsPanelOpen(!isPanelOpen)}
+        className="absolute bottom-4 right-4 px-3 py-1 text-xs font-mono text-white hover:opacity-70 transition-opacity z-50 pointer-events-auto cursor-pointer"
+      >
+        [{isPanelOpen ? "CLOSE" : "CONTROLS"}]
+      </button>
+
+      {/* Control Panel */}
+      {isPanelOpen && (
+        <div 
+          className="absolute bottom-12 right-4 w-72 bg-[#0a0a0a]/95 border border-[#444] p-4 font-mono text-xs text-[#ccc] z-50 pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#444]">
+            <span className="text-white font-normal">VIDEO ASCII</span>
+            <button
+              onClick={handleReset}
+              className="px-2 py-1 text-white hover:opacity-70 transition-opacity cursor-pointer"
+            >
+              [RESET]
+            </button>
+          </div>
+
+          {/* Character Sets */}
+          <div className="mb-4">
+            <div className="text-[#999] mb-2">CHARACTER SET</div>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(CHARACTER_SETS).map(([key, set]) => {
+                const isActive = charSetKey === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setCharSetKey(key as keyof typeof CHARACTER_SETS)}
+                    className={`px-2 py-1 transition-colors cursor-pointer ${
+                      isActive 
+                        ? "bg-white text-[#1b1b1b]" 
+                        : "text-[#ccc] hover:text-white hover:bg-[#333]"
+                    }`}
+                  >
+                    [{set.name}]
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Dark Threshold */}
+          <div className="mb-3">
+            <div className="flex justify-between text-[#999] mb-1">
+              <span>THRESHOLD</span>
+              <span className="text-white">{darkThreshold}</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="128"
+              value={darkThreshold}
+              onChange={(e) => setDarkThreshold(Number(e.target.value))}
+              className="w-full h-1 bg-[#444] appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer"
+            />
+          </div>
+
+          {/* Contrast */}
+          <div className="mb-3">
+            <div className="flex justify-between text-[#999] mb-1">
+              <span>CONTRAST</span>
+              <span className="text-white">{contrast.toFixed(1)}x</span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="3.0"
+              step="0.1"
+              value={contrast}
+              onChange={(e) => setContrast(Number(e.target.value))}
+              className="w-full h-1 bg-[#444] appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer"
+            />
+          </div>
+
+          {/* Toggles */}
+          <div className="pt-2 border-t border-[#444] space-y-2">
+            {/* Invert Toggle */}
+            <div className="flex justify-between items-center">
+              <span className="text-[#999]">INVERT</span>
+              <button
+                onClick={() => setInvert(!invert)}
+                className={`px-2 py-1 transition-colors cursor-pointer ${
+                  invert 
+                    ? "bg-white text-[#1b1b1b]" 
+                    : "text-white hover:opacity-70"
+                }`}
+              >
+                [{invert ? "ON" : "OFF"}]
+              </button>
+            </div>
+
+            {/* Colored Toggle */}
+            <div className="flex justify-between items-center">
+              <span className="text-[#999]">COLORED</span>
+              <button
+                onClick={() => setColored(!colored)}
+                className={`px-2 py-1 transition-colors cursor-pointer ${
+                  colored 
+                    ? "bg-white text-[#1b1b1b]" 
+                    : "text-white hover:opacity-70"
+                }`}
+              >
+                [{colored ? "ON" : "OFF"}]
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
