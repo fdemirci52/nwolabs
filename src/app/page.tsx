@@ -29,6 +29,7 @@ export default function Home() {
   const [mode, setMode] = useState<AsciiMode>("video");
   const [headerTypingComplete, setHeaderTypingComplete] = useState(false);
   const [showSplash, setShowSplash] = useState<boolean | null>(null);
+  const [bgColor, setBgColor] = useState("#1b1b1b");
 
   // Show splash only on new tab (not on refresh or URL re-entry)
   // sessionStorage is cleared when tab closes, so new tab = empty storage
@@ -54,7 +55,7 @@ export default function Home() {
 
   // Show empty screen while checking sessionStorage
   if (showSplash === null) {
-    return <div className="h-screen w-full" style={{ backgroundColor: "#1b1b1b" }} />;
+    return <div className="h-screen w-full" style={{ backgroundColor: bgColor }} />;
   }
 
   return (
@@ -63,10 +64,13 @@ export default function Home() {
 
       {/* Main content - only render after splash completes */}
       {!showSplash && (
-        <div className="relative h-screen w-full overflow-hidden">
+        <div 
+          className="relative h-screen w-full overflow-hidden transition-colors duration-300"
+          style={{ backgroundColor: bgColor }}
+        >
           {/* ASCII Art Background - Full Height */}
           <div className="absolute inset-0 z-0">
-            {mode === "video" && <VideoAsciiArt />}
+            {mode === "video" && <VideoAsciiArt onBgColorChange={setBgColor} />}
             {mode === "animated" && <AnimatedAsciiArt />}
             {mode === "gameoflife" && <GameOfLifeAsciiArt />}
             {mode === "flame" && <FlameAsciiArt />}

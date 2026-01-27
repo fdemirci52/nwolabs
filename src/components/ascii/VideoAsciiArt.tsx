@@ -30,11 +30,17 @@ const CHARACTER_SETS = {
   },
 };
 
+// Available video sources
+const VIDEO_SOURCES = {
+  video1: { name: "Video 1", src: "/vid1.mp4" },
+  video2: { name: "Video 2", src: "/vid2.mp4" },
+};
+
 interface VideoAsciiArtProps {
-  videoSrc?: string;
+  onBgColorChange?: (color: string) => void;
 }
 
-export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsciiArtProps) {
+export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,6 +59,9 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   const [colored, setColored] = useState(false);
   const [fontSize, setFontSize] = useState(10);
   const [lineHeight, setLineHeight] = useState(14);
+  const [videoKey, setVideoKey] = useState<keyof typeof VIDEO_SOURCES>("video1");
+  const [bgColor, setBgColor] = useState("#1b1b1b");
+  const [reversed, setReversed] = useState(false);
 
   // Refs for current settings (to avoid stale closures)
   const darkThresholdRef = useRef(darkThreshold);
@@ -62,6 +71,8 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   const coloredRef = useRef(colored);
   const fontSizeRef = useRef(fontSize);
   const lineHeightRef = useRef(lineHeight);
+  const reversedRef = useRef(reversed);
+  const lastTimeRef = useRef(0);
 
   // Update refs when state changes
   useEffect(() => {
@@ -91,6 +102,27 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   useEffect(() => {
     lineHeightRef.current = lineHeight;
   }, [lineHeight]);
+
+  useEffect(() => {
+    reversedRef.current = reversed;
+  }, [reversed]);
+
+  // Handle reverse playback
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideoReady) return;
+
+    if (reversed) {
+      video.pause();
+    } else {
+      video.play();
+    }
+  }, [reversed, isVideoReady]);
+
+  // Notify parent when bg color changes
+  useEffect(() => {
+    onBgColorChange?.(bgColor);
+  }, [bgColor, onBgColorChange]);
 
   // Character aspect ratio compensation (characters are taller than wide)
   // Dynamically calculated based on font size and line height
@@ -150,7 +182,7 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
   }, []);
 
   // Process video frame and convert to ASCII
-  const processFrame = useCallback(() => {
+  const processFrame = useCallback((timestamp: number) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d", { willReadFrequently: true });
@@ -158,6 +190,21 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
     if (!video || !canvas || !ctx || !isVideoReady) {
       animationRef.current = requestAnimationFrame(processFrame);
       return;
+    }
+
+    // Handle reverse playback
+    if (reversedRef.current) {
+      const deltaTime = (timestamp - lastTimeRef.current) / 1000;
+      lastTimeRef.current = timestamp;
+      
+      // Move backwards at normal playback speed
+      if (deltaTime > 0 && deltaTime < 0.1) {
+        video.currentTime = Math.max(0, video.currentTime - deltaTime);
+        // Loop back to end when reaching start
+        if (video.currentTime <= 0) {
+          video.currentTime = video.duration;
+        }
+      }
     }
 
     const { cols, rows } = dimensions;
@@ -278,6 +325,9 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
     setColored(false);
     setFontSize(10);
     setLineHeight(14);
+    setVideoKey("video1");
+    setBgColor("#1b1b1b");
+    setReversed(false);
   };
 
   // Render ASCII with or without colors
@@ -316,7 +366,7 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
       {/* Hidden video element */}
       <video
         ref={videoRef}
-        src={videoSrc}
+        src={VIDEO_SOURCES[videoKey].src}
         autoPlay
         loop
         muted
@@ -365,6 +415,32 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
             >
               [RESET]
             </button>
+          </div>
+
+          {/* Video Source Selection */}
+          <div className="mb-4">
+            <div className="text-[#999] mb-2">VIDEO SOURCE</div>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(VIDEO_SOURCES).map(([key, video]) => {
+                const isActive = videoKey === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setVideoKey(key as keyof typeof VIDEO_SOURCES);
+                      setIsVideoReady(false);
+                    }}
+                    className={`px-2 py-1 transition-colors cursor-pointer ${
+                      isActive 
+                        ? "bg-white text-[#1b1b1b]" 
+                        : "text-[#ccc] hover:text-white hover:bg-[#333]"
+                    }`}
+                  >
+                    [{video.name}]
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Character Sets */}
@@ -455,6 +531,39 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
             />
           </div>
 
+          {/* Background Color */}
+          <div className="mb-3">
+            <div className="flex justify-between items-center text-[#999] mb-1">
+              <span>BG COLOR</span>
+              <span className="text-white uppercase">{bgColor}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="w-8 h-8 bg-transparent border border-[#444] cursor-pointer"
+              />
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round(
+                  (parseInt(bgColor.slice(1, 3), 16) +
+                    parseInt(bgColor.slice(3, 5), 16) +
+                    parseInt(bgColor.slice(5, 7), 16)) /
+                    7.65
+                )}
+                onChange={(e) => {
+                  const val = Math.round((Number(e.target.value) / 100) * 255);
+                  const hex = val.toString(16).padStart(2, "0");
+                  setBgColor(`#${hex}${hex}${hex}`);
+                }}
+                className="flex-1 h-1 bg-[#444] appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer"
+              />
+            </div>
+          </div>
+
           {/* Toggles */}
           <div className="pt-2 border-t border-[#444] space-y-2">
             {/* Invert Toggle */}
@@ -484,6 +593,21 @@ export default function VideoAsciiArt({ videoSrc = "/web-promo.mp4" }: VideoAsci
                 }`}
               >
                 [{colored ? "ON" : "OFF"}]
+              </button>
+            </div>
+
+            {/* Reverse Toggle */}
+            <div className="flex justify-between items-center">
+              <span className="text-[#999]">REVERSE</span>
+              <button
+                onClick={() => setReversed(!reversed)}
+                className={`px-2 py-1 transition-colors cursor-pointer ${
+                  reversed 
+                    ? "bg-white text-[#1b1b1b]" 
+                    : "text-white hover:opacity-70"
+                }`}
+              >
+                [{reversed ? "ON" : "OFF"}]
               </button>
             </div>
           </div>
