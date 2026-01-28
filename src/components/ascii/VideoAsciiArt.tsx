@@ -34,6 +34,7 @@ const CHARACTER_SETS = {
 const VIDEO_SOURCES = {
   video1: { name: "Video 1", src: "/vid1.mp4" },
   video2: { name: "Video 2", src: "/vid2.mp4" },
+  video3: { name: "Video 3", src: "/vid3.mp4" },
 };
 
 interface VideoAsciiArtProps {
