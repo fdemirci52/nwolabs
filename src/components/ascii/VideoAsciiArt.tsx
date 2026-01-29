@@ -6,7 +6,19 @@ import { useEffect, useRef, useState, useCallback } from "react";
 const CHARACTER_SETS = {
   default: {
     name: "Default",
-    chars: " .`'^,:;l!i><~+_-?]0[}{1|/*#•—%x⁰⁴⁷—⁺⁻⁼₀₁₃₊$&☐‡°®",
+    chars: " .'`^,:;!|(){}[]?-_+~<>i1lrtfxnuvczXYJCLQO0Zmwpqdbkha*#MW&8%B@$",
+  },
+  classic: {
+    name: "Classic",
+    chars: " .'-:;=+*#%@",
+  },
+  extended: {
+    name: "Extended",
+    chars: " .'`^,:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+  },
+  minimal: {
+    name: "Minimal",
+    chars: " .,:;+*?%S#@",
   },
   blocks: {
     name: "Blocks",
@@ -28,13 +40,22 @@ const CHARACTER_SETS = {
     name: "Dots",
     chars: " ·∘○◎●◉⬤",
   },
+  dense: {
+    name: "Dense",
+    chars: " .oO0@",
+  },
+  letters: {
+    name: "Letters",
+    chars: " abcdefghijklmnopqrstuvwxyz",
+  },
 };
 
 interface VideoAsciiArtProps {
   onBgColorChange?: (color: string) => void;
+  bottomOffset?: number; // Pixel height to hide from bottom for overlay content
 }
 
-export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
+export default function VideoAsciiArt({ onBgColorChange, bottomOffset = 0 }: VideoAsciiArtProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,15 +67,21 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
 
   // Control panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [darkThreshold, setDarkThreshold] = useState(17);
+  const [darkThreshold, setDarkThreshold] = useState(15);
   const [contrast, setContrast] = useState(1.0);
   const [invert, setInvert] = useState(false);
   const [charSetKey, setCharSetKey] = useState<keyof typeof CHARACTER_SETS>("default");
   const [colored, setColored] = useState(false);
   const [fontSize, setFontSize] = useState(10);
-  const [lineHeight, setLineHeight] = useState(14);
+  const [lineHeight, setLineHeight] = useState(15);
   const [bgColor, setBgColor] = useState("#060606");
   const [reversed, setReversed] = useState(false);
+  
+  // Video playback state
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const isPausedRef = useRef(isPaused);
 
   // Refs for current settings (to avoid stale closures)
   const darkThresholdRef = useRef(darkThreshold);
@@ -100,17 +127,70 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
     reversedRef.current = reversed;
   }, [reversed]);
 
-  // Handle reverse playback
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  // Handle pause/play
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !isVideoReady) return;
 
-    if (reversed) {
+    if (isPaused || reversed) {
       video.pause();
     } else {
       video.play();
     }
-  }, [reversed, isVideoReady]);
+  }, [isPaused, reversed, isVideoReady]);
+
+  // Update duration when video loads
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleLoadedMetadata = () => {
+      setDuration(video.duration);
+    };
+
+    const handleTimeUpdate = () => {
+      if (!isPausedRef.current) {
+        setCurrentTime(video.currentTime);
+      }
+    };
+
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("timeupdate", handleTimeUpdate);
+
+    // If already loaded
+    if (video.duration) {
+      setDuration(video.duration);
+    }
+
+    return () => {
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+    };
+  }, []);
+
+  // Handle seeking
+  const handleSeek = (time: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = time;
+    setCurrentTime(time);
+  };
+
+  // Toggle pause
+  const togglePause = () => {
+    setIsPaused(!isPaused);
+  };
+
+  // Format time as MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   // Notify parent when bg color changes
   useEffect(() => {
@@ -163,15 +243,20 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
     adjustedBrightness = ((adjustedBrightness - 128) * contrastVal) + 128;
     adjustedBrightness = Math.max(0, Math.min(255, adjustedBrightness));
 
-    // Return space for dark areas
+    // Return space for dark areas (below threshold)
     if (adjustedBrightness < threshold) {
       return " ";
     }
 
-    // Map remaining brightness range to ASCII characters
+    // Get visible characters (skip the leading space in the set)
+    const visibleChars = chars.trimStart() || chars.slice(1);
+    
+    // Map brightness to visible ASCII characters only
+    // Threshold → first visible char (lightest)
+    // 255 → last visible char (densest)
     const normalized = (adjustedBrightness - threshold) / (255 - threshold);
-    const index = Math.floor(normalized * (chars.length - 1));
-    return chars[Math.min(index, chars.length - 1)];
+    const index = Math.floor(normalized * (visibleChars.length - 1));
+    return visibleChars[Math.min(Math.max(0, index), visibleChars.length - 1)];
   }, []);
 
   // Process video frame and convert to ASCII
@@ -311,15 +396,16 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
 
   // Reset to defaults
   const handleReset = () => {
-    setDarkThreshold(17);
+    setDarkThreshold(15);
     setContrast(1.0);
     setInvert(false);
     setCharSetKey("default");
     setColored(false);
     setFontSize(10);
-    setLineHeight(14);
+    setLineHeight(15);
     setBgColor("#060606");
     setReversed(false);
+    setIsPaused(false);
   };
 
   // Render ASCII with or without colors
@@ -375,10 +461,14 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
         className="absolute opacity-0 pointer-events-none"
       />
 
-      {/* ASCII output - anchored to bottom */}
+      {/* ASCII output - anchored to bottom, clipped from bottom for overlay content */}
       <pre 
-        className="absolute bottom-0 left-0 right-0 font-light whitespace-pre mb-1 p-0 text-[#888]"
-        style={{ fontSize: `${fontSize}px`, lineHeight: `${lineHeight}px` }}
+        className="absolute left-0 right-0 bottom-0 font-light whitespace-pre p-0 text-[#888]"
+        style={{ 
+          fontSize: `${fontSize}px`, 
+          lineHeight: `${lineHeight}px`,
+          clipPath: bottomOffset > 0 ? `inset(0 0 ${bottomOffset}px 0)` : "none"
+        }}
       >
         {renderAscii()}
       </pre>
@@ -407,6 +497,40 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
             >
               [RESET]
             </button>
+          </div>
+
+          {/* Video Playback Controls */}
+          <div className="mb-4 pb-3 border-b border-[#444]">
+            <div className="flex justify-between items-center text-[#999] mb-2">
+              <span>PLAYBACK</span>
+              <span className="text-white">{formatTime(currentTime)} / {formatTime(duration)}</span>
+            </div>
+            
+            {/* Timeline Slider */}
+            <input
+              type="range"
+              min="0"
+              max={duration || 100}
+              step="0.1"
+              value={currentTime}
+              onChange={(e) => handleSeek(Number(e.target.value))}
+              className="w-full h-1 bg-[#444] appearance-none cursor-pointer mb-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer"
+            />
+            
+            {/* Play/Pause Button */}
+            <div className="flex justify-between items-center">
+              <span className="text-[#999]">PAUSE</span>
+              <button
+                onClick={togglePause}
+                className={`px-2 py-1 transition-colors cursor-pointer ${
+                  isPaused 
+                    ? "bg-white text-[#1b1b1b]" 
+                    : "text-white hover:opacity-70"
+                }`}
+              >
+                [{isPaused ? "ON" : "OFF"}]
+              </button>
+            </div>
           </div>
 
           {/* Character Sets */}
