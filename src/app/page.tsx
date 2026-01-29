@@ -2,14 +2,9 @@
 
 import { useState, useEffect } from "react";
 import VideoAsciiArt from "@/components/ascii/VideoAsciiArt";
-import AnimatedAsciiArt from "@/components/ascii/AnimatedAsciiArt";
-import GameOfLifeAsciiArt from "@/components/ascii/GameOfLifeAsciiArt";
-import FlameAsciiArt from "@/components/ascii/FlameAsciiArt";
 import TypewriterText from "@/components/text-effects/TypewriterText";
 import HoverRevealText from "@/components/text-effects/HoverRevealText";
 import SplashScreen from "@/components/SplashScreen";
-
-type AsciiMode = "video" | "animated" | "gameoflife" | "flame";
 
 // Typing speed (characters per second)
 const CHARS_PER_SECOND = 18;
@@ -18,18 +13,13 @@ const STAGGER_DELAY = 120;
 
 // Nav items for typewriter effect (text without brackets)
 const NAV_ITEMS = [
-  { text: "VIDEO", id: "video" as const },
-  { text: "MATRIX", id: "animated" as const },
-  { text: "LIFE", id: "gameoflife" as const },
-  { text: "FLAME", id: "flame" as const },
   { text: "ABOUT", href: "#about" },
 ];
 
 export default function Home() {
-  const [mode, setMode] = useState<AsciiMode>("video");
   const [headerTypingComplete, setHeaderTypingComplete] = useState(false);
   const [showSplash, setShowSplash] = useState<boolean | null>(null);
-  const [bgColor, setBgColor] = useState("#1b1b1b");
+  const [bgColor, setBgColor] = useState("#060606");
 
   // Show splash only on new tab (not on refresh or URL re-entry)
   // sessionStorage is cleared when tab closes, so new tab = empty storage
@@ -70,10 +60,7 @@ export default function Home() {
         >
           {/* ASCII Art Background - Full Height */}
           <div className="absolute inset-0 z-0">
-            {mode === "video" && <VideoAsciiArt onBgColorChange={setBgColor} />}
-            {mode === "animated" && <AnimatedAsciiArt />}
-            {mode === "gameoflife" && <GameOfLifeAsciiArt />}
-            {mode === "flame" && <FlameAsciiArt />}
+            <VideoAsciiArt onBgColorChange={setBgColor} />
           </div>
 
           {/* Content Layer */}
@@ -98,9 +85,6 @@ export default function Home() {
               </div>
               <nav className="flex gap-[20px] pointer-events-auto">
                 {NAV_ITEMS.map((item, index) => {
-                  const modeId = "id" in item ? item.id : null;
-                  const isActive = modeId !== null && mode === modeId;
-                  const isLink = "href" in item;
                   const fullLabel = `[${item.text}]`;
 
                   const innerContent = (
@@ -121,30 +105,14 @@ export default function Home() {
                     </span>
                   );
 
-                  const baseClass = `whitespace-nowrap transition-colors duration-300 ease-in-out hover:text-white ${
-                    isActive ? "text-white" : "text-white/50"
-                  }`;
-
-                  if (isLink) {
-                    return (
-                      <a
-                        key={item.text}
-                        href={item.href}
-                        className={baseClass}
-                      >
-                        {innerContent}
-                      </a>
-                    );
-                  }
-
                   return (
-                    <button
+                    <a
                       key={item.text}
-                      onClick={() => modeId && setMode(modeId)}
-                      className={`${baseClass} cursor-pointer`}
+                      href={item.href}
+                      className="whitespace-nowrap transition-colors duration-300 ease-in-out hover:text-white text-white/50 hover:text-white"
                     >
                       {innerContent}
-                    </button>
+                    </a>
                   );
                 })}
               </nav>

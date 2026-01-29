@@ -30,13 +30,6 @@ const CHARACTER_SETS = {
   },
 };
 
-// Available video sources
-const VIDEO_SOURCES = {
-  video1: { name: "Video 1", src: "/vid1.mp4" },
-  video2: { name: "Video 2", src: "/vid2.mp4" },
-  video3: { name: "Video 3", src: "/vid3.mp4" },
-};
-
 interface VideoAsciiArtProps {
   onBgColorChange?: (color: string) => void;
 }
@@ -53,15 +46,14 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
 
   // Control panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [darkThreshold, setDarkThreshold] = useState(30);
+  const [darkThreshold, setDarkThreshold] = useState(17);
   const [contrast, setContrast] = useState(1.0);
   const [invert, setInvert] = useState(false);
   const [charSetKey, setCharSetKey] = useState<keyof typeof CHARACTER_SETS>("default");
   const [colored, setColored] = useState(false);
   const [fontSize, setFontSize] = useState(10);
   const [lineHeight, setLineHeight] = useState(14);
-  const [videoKey, setVideoKey] = useState<keyof typeof VIDEO_SOURCES>("video1");
-  const [bgColor, setBgColor] = useState("#1b1b1b");
+  const [bgColor, setBgColor] = useState("#060606");
   const [reversed, setReversed] = useState(false);
 
   // Refs for current settings (to avoid stale closures)
@@ -319,15 +311,14 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
 
   // Reset to defaults
   const handleReset = () => {
-    setDarkThreshold(30);
+    setDarkThreshold(17);
     setContrast(1.0);
     setInvert(false);
     setCharSetKey("default");
     setColored(false);
     setFontSize(10);
     setLineHeight(14);
-    setVideoKey("video1");
-    setBgColor("#1b1b1b");
+    setBgColor("#060606");
     setReversed(false);
   };
 
@@ -367,7 +358,7 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
       {/* Hidden video element */}
       <video
         ref={videoRef}
-        src={VIDEO_SOURCES[videoKey].src}
+        src="/video.mp4"
         autoPlay
         loop
         muted
@@ -416,32 +407,6 @@ export default function VideoAsciiArt({ onBgColorChange }: VideoAsciiArtProps) {
             >
               [RESET]
             </button>
-          </div>
-
-          {/* Video Source Selection */}
-          <div className="mb-4">
-            <div className="text-[#999] mb-2">VIDEO SOURCE</div>
-            <div className="flex flex-wrap gap-1">
-              {Object.entries(VIDEO_SOURCES).map(([key, video]) => {
-                const isActive = videoKey === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      setVideoKey(key as keyof typeof VIDEO_SOURCES);
-                      setIsVideoReady(false);
-                    }}
-                    className={`px-2 py-1 transition-colors cursor-pointer ${
-                      isActive 
-                        ? "bg-white text-[#1b1b1b]" 
-                        : "text-[#ccc] hover:text-white hover:bg-[#333]"
-                    }`}
-                  >
-                    [{video.name}]
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {/* Character Sets */}
