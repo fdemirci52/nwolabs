@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import VideoAsciiArt from "@/components/ascii/VideoAsciiArt";
 import TypewriterText from "@/components/text-effects/TypewriterText";
 import HoverRevealText from "@/components/text-effects/HoverRevealText";
-import LineRevealText from "@/components/text-effects/LineRevealText";
 import SplashScreen from "@/components/SplashScreen";
 
 // Typing speed (characters per second)
 const CHARS_PER_SECOND = 18;
+// Fast typing for about section
+const ABOUT_CHARS_PER_SECOND = 80;
 
 // About text content
 const ABOUT_TEXT = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
@@ -125,32 +126,27 @@ export default function Home() {
 
             {/* About Section - Bottom Left */}
             <footer className="col-span-8 self-end">
-              {/* Wrapper that controls height - expands instantly when opened */}
               <div 
-                className="overflow-hidden"
+                ref={aboutRef}
+                className={`max-w-[600px] transition-opacity duration-300 ${
+                  isAboutOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                }`}
                 style={{ 
-                  maxHeight: isAboutOpen ? "500px" : "0px"
+                  fontSize: "14px", 
+                  lineHeight: "21px",
+                  paddingTop: "28px" // Match bottom padding from grid-container
                 }}
               >
-                <div 
-                  ref={aboutRef}
-                  className="max-w-[600px]"
-                  style={{ 
-                    paddingTop: "28px" // Match bottom padding from grid-container
-                  }}
-                >
-                  <LineRevealText
-                    isVisible={isAboutOpen}
-                    staggerDelay={0.15}
-                    lineDuration={0.8}
-                    style={{ 
-                      fontSize: "14px", 
-                      lineHeight: "21px"
-                    }}
+                {isAboutOpen && (
+                  <TypewriterText
+                    delay={0}
+                    charsPerSecond={ABOUT_CHARS_PER_SECOND}
+                    disableGlitch
+                    hideCursor
                   >
                     {ABOUT_TEXT}
-                  </LineRevealText>
-                </div>
+                  </TypewriterText>
+                )}
               </div>
             </footer>
           </div>
